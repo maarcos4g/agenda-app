@@ -1,56 +1,78 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:test_app/models/contact_model.dart';
-import 'package:test_app/modules/add_contact/add_contact_view.dart';
+import 'package:test_app/modules/contact_details/contact_details_view.dart';
 import 'package:test_app/services/contacts_service.dart';
 
 class FavoritesContactsView extends StatefulWidget {
   const FavoritesContactsView({super.key});
 
   @override
-  State<FavoritesContactsView> createState() => _FavoritseContactsViewState();
+  State<FavoritesContactsView> createState() => _FavoritesContactsViewState();
 }
 
-class _FavoritseContactsViewState extends State<FavoritesContactsView> {
+class _FavoritesContactsViewState extends State<FavoritesContactsView> {
   final service = ContactService();
+  final searchController = TextEditingController();
 
-  List<ContactModel> _rawContacts = [];
+  List<ContactModel> _favorites = [];
   bool _isLoading = true;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _loadContacts();
+    _loadFavorites();
   }
 
-  Future<void> _loadContacts() async {
-    final contacts = await service.get();
-    setState(() {
-      _rawContacts = contacts.where((item) => item.isFavorite == true).toList();
-      _isLoading = false;
-    });
-  }
-
-  Map<String, List<ContactModel>> get _groupedContacts {
-    final Map<String, List<ContactModel>> grouped = {};
-
-    for (var contact in _rawContacts) {
-      final name = contact.name;
-      if (name.isEmpty) continue;
-
-      final firstLetter = name[0].toUpperCase();
-
-      if (!grouped.containsKey(firstLetter)) {
-        grouped[firstLetter] = [];
-      }
-      grouped[firstLetter]!.add(contact);
+  Future<void> _loadFavorites() async {
+    final allFavorites = await service.getFavorites();
+    if (_searchQuery.trim().isEmpty) {
+      setState(() {
+        _favorites = allFavorites;
+        _isLoading = false;
+      });
+    } else {
+      final q = _searchQuery.toLowerCase().trim();
+      final filtered = allFavorites.where((c) {
+        return c.name.toLowerCase().contains(q) ||
+            c.email.toLowerCase().contains(q) ||
+            c.phone.contains(q);
+      }).toList();
+      setState(() {
+        _favorites = filtered;
+        _isLoading = false;
+      });
     }
+  }
 
-    grouped.forEach((key, list) {
-      list.sort((a, b) => a.name.compareTo(b.name));
-    });
+  Future<void> _removeFavorite(ContactModel contact) async {
+    final updated = contact.copyWith(isFavorite: false);
+    await service.update(updated);
+    _loadFavorites();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${contact.name} removido dos favoritos.'),
+        action: SnackBarAction(
+          label: 'Desfazer',
+          onPressed: () async {
+            await service.update(contact.copyWith(isFavorite: true));
+            _loadFavorites();
+          },
+        ),
+      ),
+    );
+  }
 
-    return grouped;
+  Future<void> _openDetails(ContactModel contact) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ContactDetailsView(contact: contact),
+      ),
+    );
+    _loadFavorites();
   }
 
   @override
@@ -59,119 +81,128 @@ class _FavoritseContactsViewState extends State<FavoritesContactsView> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final groupedData = _groupedContacts;
-    final sortedLetters = groupedData.keys.toList()..sort();
-
     return Column(
-      spacing: 24,
       children: [
-        Row(
-          spacing: 16,
-          children: [
-            Expanded(
-              child: TextField(
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: 'Pesquisar',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(32.0),
-                    borderSide: BorderSide(color: Colors.grey),
-                  ),
-                ),
-              ),
+        // Barra de Pesquisa em Favoritos
+        TextField(
+          controller: searchController,
+          onChanged: (val) {
+            setState(() {
+              _searchQuery = val;
+            });
+            _loadFavorites();
+          },
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: 'Pesquisar em favoritos...',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear, size: 18),
+                    onPressed: () {
+                      searchController.clear();
+                      setState(() {
+                        _searchQuery = '';
+                      });
+                      _loadFavorites();
+                    },
+                  )
+                : null,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(32.0),
+              borderSide: const BorderSide(color: Colors.grey),
             ),
-          ],
+          ),
         ),
-        Expanded(
-          child: sortedLetters.isEmpty
-              ? Center(child: Text('Nenhum contato encontrado'))
-              : ListView(
-                  children: sortedLetters.map((letter) {
-                    final contacts = groupedData[letter]!;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            vertical: 8,
-                            horizontal: 16,
-                          ),
-                          child: Text(
-                            letter,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ),
-                        Divider(height: 1, color: Colors.black12),
+        const SizedBox(height: 12),
 
-                        ...contacts.map((contact) {
-                          return Slidable(
-                            key: ValueKey(contact.email),
-                            endActionPane: ActionPane(
-                              motion: DrawerMotion(),
-                              children: [
-                                SlidableAction(
-                                  onPressed: (context) async {
-                                    contact.isFavorite == false
-                                        ? await service.update(
-                                            ContactModel(
-                                              email: contact.email,
-                                              name: contact.name,
-                                              phone: contact.phone,
-                                              imagePath: contact.imagePath,
-                                              isFavorite: true,
-                                            ),
-                                          )
-                                        : await service.update(
-                                            ContactModel(
-                                              email: contact.email,
-                                              name: contact.name,
-                                              phone: contact.phone,
-                                              imagePath: contact.imagePath,
-                                              isFavorite: false,
-                                            ),
-                                          );
-                                    _loadContacts();
-                                  },
-                                  backgroundColor: Colors.blueAccent,
-                                  foregroundColor: Colors.white,
-                                  icon: contact.isFavorite == false
-                                      ? Icons.star
-                                      : Icons.star_half_outlined,
-                                ),
-                              ],
-                            ),
-                            child: ListTile(
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 4,
-                              ),
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.grey.shade300,
-                                child: Container(
-                                  width: 48,
-                                  height: 48,
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    contact.name[0].toString().toUpperCase(),
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              trailing: Icon(Icons.star),
-                              title: Text(contact.name),
-                            ),
-                          );
-                        }),
-                      ],
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.star, color: Colors.amber, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${_favorites.length} contatos favoritos',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 12),
+
+        // Listagem
+        Expanded(
+          child: _favorites.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.star_border, size: 54, color: Colors.amber.shade200),
+                      const SizedBox(height: 12),
+                      Text(
+                        _searchQuery.isEmpty
+                            ? 'Você ainda não possui favoritos.'
+                            : 'Nenhum favorito para "$_searchQuery"',
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 15),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Marque a estrela ao cadastrar ou deslize um contato.',
+                        style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.separated(
+                  itemCount: _favorites.length,
+                  separatorBuilder: (_, index) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final contact = _favorites[index];
+                    final hasImg = contact.imagePath != null && contact.imagePath!.trim().isNotEmpty;
+
+                    return Slidable(
+                      key: ValueKey(contact.email),
+                      endActionPane: ActionPane(
+                        motion: const DrawerMotion(),
+                        children: [
+                          SlidableAction(
+                            onPressed: (_) => _removeFavorite(contact),
+                            backgroundColor: Colors.amber,
+                            foregroundColor: Colors.white,
+                            icon: Icons.star_border,
+                            label: 'Remover',
+                          ),
+                        ],
+                      ),
+                      child: ListTile(
+                        onTap: () => _openDetails(contact),
+                        leading: CircleAvatar(
+                          radius: 22,
+                          backgroundColor: Colors.amber.shade100,
+                          backgroundImage: hasImg ? NetworkImage(contact.imagePath!) : null,
+                          child: !hasImg
+                              ? Text(
+                                  contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                                )
+                              : null,
+                        ),
+                        title: Text(contact.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text(contact.phone, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.star, color: Colors.amber),
+                          tooltip: 'Remover dos favoritos',
+                          onPressed: () => _removeFavorite(contact),
+                        ),
+                      ),
                     );
-                  }).toList(),
+                  },
                 ),
         ),
       ],
