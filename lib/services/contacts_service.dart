@@ -20,10 +20,10 @@ class ContactService {
         .toList();
   }
 
-  Future<ContactModel> getByEmail(String email) async {
+  Future<ContactModel> getById(String id) async {
     final contacts = await get();
     final contact = contacts.firstWhere(
-      (item) => item.email == email,
+      (item) => item.id == id,
       orElse: () => throw StateError('Contato não encontrado'),
     );
     return contact;
@@ -46,9 +46,7 @@ class ContactService {
   Future<void> update(ContactModel contact) async {
     final contacts = await get();
 
-    final index = contacts.indexWhere(
-      (item) => item.email == contact.email
-    );
+    final index = contacts.indexWhere((item) => item.id == contact.id);
 
     if (index.isNegative) {
       throw StateError('Contato não encontrado');
@@ -61,7 +59,20 @@ class ContactService {
   Future<void> delete(ContactModel contact) async {
     final contacts = await get();
 
-    contacts.removeWhere((item) => item.email == contact.email);
+    contacts.removeWhere((item) => item.id == contact.id);
+    await _saveContacts(contacts);
+  }
+
+  Future<void> setFavoriteStatus(String id, bool isFavorite) async {
+    final contacts = await get();
+    final index = contacts.indexWhere((item) => item.id == id);
+
+    if (index.isNegative) {
+      throw StateError('Contato não encontrado');
+    }
+
+    contacts[index] = contacts[index].copyWith(isFavorite: isFavorite);
+
     await _saveContacts(contacts);
   }
 }

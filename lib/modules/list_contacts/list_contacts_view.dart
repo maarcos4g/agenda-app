@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:test_app/models/contact_model.dart';
-import 'package:test_app/modules/add_contact/add_contact_view.dart';
+import 'package:test_app/modules/add_contact/add_edit_contact_view.dart';
+import 'package:test_app/modules/details_contact/details_contact_view.dart';
 import 'package:test_app/services/contacts_service.dart';
 
 class ListContactsView extends StatefulWidget {
@@ -86,7 +87,7 @@ class _ListContactsViewState extends State<ListContactsView> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => AddContactScreen()),
+                  MaterialPageRoute(builder: (context) => AddEditContactScreen()),
                 );
               },
               style: IconButton.styleFrom(
@@ -129,24 +130,8 @@ class _ListContactsViewState extends State<ListContactsView> {
                                 SlidableAction(
                                   onPressed: (context) async {
                                     contact.isFavorite == false
-                                        ? await service.update(
-                                            ContactModel(
-                                              email: contact.email,
-                                              name: contact.name,
-                                              phone: contact.phone,
-                                              imagePath: contact.imagePath,
-                                              isFavorite: true,
-                                            ),
-                                          )
-                                        : await service.update(
-                                            ContactModel(
-                                              email: contact.email,
-                                              name: contact.name,
-                                              phone: contact.phone,
-                                              imagePath: contact.imagePath,
-                                              isFavorite: false,
-                                            ),
-                                          );
+                                        ? await service.setFavoriteStatus(contact.id, true)
+                                        : await service.setFavoriteStatus(contact.id, false);
                                     _loadContacts();
                                   },
                                   backgroundColor: Colors.blueAccent,
@@ -167,6 +152,15 @@ class _ListContactsViewState extends State<ListContactsView> {
                               ],
                             ),
                             child: ListTile(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        DetailsContactView(contact: contact),
+                                  ),
+                                );
+                              },
                               contentPadding: EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 4,

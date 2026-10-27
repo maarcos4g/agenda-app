@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:test_app/models/contact_model.dart';
-import 'package:test_app/modules/add_contact/add_contact_view.dart';
+import 'package:test_app/modules/add_contact/add_edit_contact_view.dart';
 import 'package:test_app/services/contacts_service.dart';
 
 class FavoritesContactsView extends StatefulWidget {
@@ -117,24 +117,8 @@ class _FavoritseContactsViewState extends State<FavoritesContactsView> {
                                 SlidableAction(
                                   onPressed: (context) async {
                                     contact.isFavorite == false
-                                        ? await service.update(
-                                            ContactModel(
-                                              email: contact.email,
-                                              name: contact.name,
-                                              phone: contact.phone,
-                                              imagePath: contact.imagePath,
-                                              isFavorite: true,
-                                            ),
-                                          )
-                                        : await service.update(
-                                            ContactModel(
-                                              email: contact.email,
-                                              name: contact.name,
-                                              phone: contact.phone,
-                                              imagePath: contact.imagePath,
-                                              isFavorite: false,
-                                            ),
-                                          );
+                                        ? await service.setFavoriteStatus(contact.id, true)
+                                        : await service.setFavoriteStatus(contact.id, false);
                                     _loadContacts();
                                   },
                                   backgroundColor: Colors.blueAccent,

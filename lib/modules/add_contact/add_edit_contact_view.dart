@@ -4,21 +4,38 @@ import 'package:test_app/models/contact_model.dart';
 import 'package:test_app/modules/home/home_view.dart';
 import 'package:test_app/services/contacts_service.dart';
 
-class AddContactScreen extends StatefulWidget {
-  const AddContactScreen({super.key});
+class AddEditContactScreen extends StatefulWidget {
+  AddEditContactScreen({super.key, this.contact});
+  ContactModel? contact;
 
   @override
-  State<AddContactScreen> createState() => _AddContactScreenState();
+  State<AddEditContactScreen> createState() => _AddEditContactScreenState();
 }
 
-class _AddContactScreenState extends State<AddContactScreen> {
+class _AddEditContactScreenState extends State<AddEditContactScreen> {
   final formKey = GlobalKey<FormState>();
 
   final nameController = TextEditingController();
   final emailController = TextEditingController();
-  final phoneController = MaskedTextController(
-    mask: '(00) 00000-0000',
-  );
+  final phoneController = MaskedTextController(mask: '(00) 00000-0000');
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.contact != null) {
+      nameController.text = widget.contact!.name;
+      emailController.text = widget.contact!.email;
+      phoneController.text = widget.contact!.phone;
+    }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +44,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
         elevation: 0,
         actionsPadding: EdgeInsets.symmetric(horizontal: 16),
         title: Text(
-          'Novo Contato',
+          widget.contact == null ? 'Novo Contato' : 'Editar Contato',
           style: TextStyle(fontSize: 16, color: Colors.black87),
         ),
         leading: IconButton(
@@ -41,18 +58,20 @@ class _AddContactScreenState extends State<AddContactScreen> {
             onTap: () async {
               if (formKey.currentState!.validate()) {
                 final contact = ContactModel(
-                  imagePath: null,
+                  id: widget.contact?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                  imagePath: widget.contact?.imagePath,
                   name: nameController.text,
                   email: emailController.text,
                   phone: phoneController.text,
                 );
-                await ContactService().add(contact);
-                setState(() {});
+                if (widget.contact == null) {
+                  await ContactService().add(contact);
+                } else {
+                  await ContactService().update(contact);
+                }
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => HomeView(),
-                  ),
+                  MaterialPageRoute(builder: (context) => HomeView()),
                 );
               }
             },
@@ -95,7 +114,8 @@ class _AddContactScreenState extends State<AddContactScreen> {
                   ),
                   isDense: true,
                 ),
-                validator: (String? value) => value?.isEmpty ?? true ? 'Campo obrigatório' : null,
+                validator: (String? value) =>
+                    value?.isEmpty ?? true ? 'Campo obrigatório' : null,
               ),
               TextFormField(
                 controller: emailController,
@@ -107,7 +127,8 @@ class _AddContactScreenState extends State<AddContactScreen> {
                   ),
                   isDense: true,
                 ),
-                validator: (String? value) => value?.isEmpty ?? true ? 'Campo obrigatório' : null,
+                validator: (String? value) =>
+                    value?.isEmpty ?? true ? 'Campo obrigatório' : null,
               ),
               TextFormField(
                 controller: phoneController,
@@ -119,7 +140,8 @@ class _AddContactScreenState extends State<AddContactScreen> {
                   ),
                   isDense: true,
                 ),
-                validator: (String? value) => value?.isEmpty ?? true ? 'Campo obrigatório' : null,
+                validator: (String? value) =>
+                    value?.isEmpty ?? true ? 'Campo obrigatório' : null,
               ),
             ],
           ),
